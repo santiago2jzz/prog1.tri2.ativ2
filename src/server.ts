@@ -6,6 +6,7 @@ async function testRoute(req: Bun.BunRequest) {
     method: req.method,
     time: new Date().toLocaleString('pt-BR'),
     body: await req.body?.text(),
+    key: crypto.randomUUID()
   });
 }
 
@@ -33,27 +34,58 @@ const server = Bun.serve({
         if (!data?.title) 
           return new Response('É preciso informar title', { status: 400 })
 
+        let index: number
+
         try {
-          await todolist.addItem(new Item(data.title))
+          index = await todolist.addItem(new Item(data.title))
         } catch (error) {
           return new Response('Erro ao adicionar item', { status: 500 })
         }
 
-        return new Response('Created', { status: 201 })
+        return Response.json({ index }, { status: 201 })
       }
     },
     '/todo/:index': {
       GET: (req) => {
         return new Response("Not implemented yet!", { status: 501 })
       },
-      DELETE: (req) => {
+      DELETE: async (req) => {
         const strIndex = req.params.index
         const index = parseInt(strIndex)
         if (isNaN(index)) 
           return new Response('/todo/:index index precisa ser um número inteiro', { status: 400 })
-        todolist.removeItem(index)
-        return new Response(`Item do index ${index} removido.`)
-      }
+        try {
+          await todolist.removeItem(index)
+          return new Response(`Item do index ${index} removido.`)
+        } catch(e) {
+          return new Response(`Item do index ${index} não existe.`, { status: 400 })
+        }
+      },
+                   PUT : async (req) => {
+                let data
+                const indexStr = req.params.index;
+                const index = parseInt(indexStr);
+
+                if (isNaN(index)) {
+                return new Response('Erro, precisa de um número', { status: 400 })
+                }
+
+                try {
+                    data = await req.body?.json();
+                } catch (e) {
+                    return new Response('Json do corpo mal formatado', { status: 400 })
+                }
+                if (!data?.title) {
+                    return new Response('É preciso informar title', { status: 400 })
+                }
+                
+                try {
+                await todolist.updateItem(index, new Item(data.title));
+                } catch (e) {
+                    return new Response('Erro ao adicionar ITEM:', { status: 500 })
+                }
+                    return new Response("Atualizado com sucesso");
+            }
     }
   },
   fetch(req) {
